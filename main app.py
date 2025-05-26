@@ -5,7 +5,11 @@ from io import BytesIO
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts import CONVERSATION_PROMPT
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
 
 st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 
@@ -13,11 +17,22 @@ st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 chat_model = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.3)
 
+# Memory for chat history
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+# Define custom prompt template (instead of using CONVERSATION_PROMPT)
+prompt = ChatPromptTemplate.from_messages([
+    SystemMessagePromptTemplate.from_template(
+        "You are a helpful AI assistant that extracts billing info from user input and PDFs."
+    ),
+    HumanMessagePromptTemplate.from_template("{input}")
+])
+
+# Create conversation chain with prompt and memory
 conversation = ConversationChain(
     llm=chat_model,
     memory=memory,
-    prompt=CONVERSATION_PROMPT,
+    prompt=prompt,
 )
 
 st.title("Fintech Billing Extractor Chatbot")
@@ -26,10 +41,10 @@ uploaded_files = st.file_uploader(
     "Upload multiple invoice PDFs", type=["pdf"], accept_multiple_files=True
 )
 
-# Placeholder for extracted data rows
+# Store extracted rows for Excel
 extracted_rows = []
 
-# Chatbot interaction to ask user for fields
+# Chatbot UI
 st.header("Chat with Billing Assistant")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -40,52 +55,40 @@ def user_message():
 user_input = user_message()
 
 if user_input:
-    # Append user message to chat history
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-
-    # Get response from chatbot
     response = conversation.predict(input=user_input)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
     st.write("**Assistant:**", response)
 
-# Function to extract text from PDFs
 def extract_text_from_pdf(file):
     text = ""
     with pdfplumber.open(file) as pdf:
         for page in pdf.pages:
-            text += page.extract_text() + "\n"
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
     return text
 
-# Button to trigger extraction and Excel generation
 if st.button("Extract Data and Generate Excel"):
     if not uploaded_files:
         st.error("Please upload PDF invoice files first.")
     else:
-        # For demo: extract simple fields by searching for user requested fields in chat
-        # Parse fields from last user input (naive approach)
+        # Get last user input about fields
         fields = []
-        last_user_text = (
-            st.session_state.chat_history[-2]["content"]
-            if len(st.session_state.chat_history) >= 2
-            else ""
-        )
-        # Simple keywords check
-        keywords = ["invoice number", "vendor", "date", "total amount", "amount", "due date"]
-        for kw in keywords:
-            if kw in last_user_text.lower():
-                fields.append(kw)
-
+        if len(st.session_state.chat_history) >= 2:
+            last_user_text = st.session_state.chat_history[-2]["content"].lower()
+            keywords = ["invoice number", "vendor", "date", "total amount", "amount", "due date"]
+            for kw in keywords:
+                if kw in last_user_text:
+                    fields.append(kw)
         if not fields:
-            # Default fields if user did not specify
             fields = ["invoice number", "vendor", "date", "total amount"]
 
         for file in uploaded_files:
             text = extract_text_from_pdf(file)
-            # Very naive extraction: search lines for each field keyword
             row = {}
             lines = text.split("\n")
             for field in fields:
-                # Find line with field keyword and extract text after colon or keyword
                 value = ""
                 for line in lines:
                     if field in line.lower():
@@ -114,7 +117,7 @@ if st.button("Extract Data and Generate Excel"):
         else:
             st.warning("No data extracted. Try specifying billing fields in chat first.")
 
-# Show chat history
+# Display chat history
 if st.session_state.chat_history:
     st.subheader("Chat History")
     for chat in st.session_state.chat_history:
