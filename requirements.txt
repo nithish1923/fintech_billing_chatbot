@@ -3,4 +3,6 @@ pdfplumber
 pandas
 openai
 langchain
+langchain_community
 openpyxl
+
