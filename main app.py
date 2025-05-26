@@ -8,18 +8,14 @@ from langchain.memory import ConversationBufferMemory
 
 st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 
-# Initialize OpenAI Chat model
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 chat_model = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.3)
 
-# Initialize memory
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# Initialize memory (without specifying memory_key, just default)
+memory = ConversationBufferMemory(return_messages=True)
 
-# Create conversation chain WITHOUT prompt param
-conversation = ConversationChain(
-    llm=chat_model,
-    memory=memory
-)
+# Initialize ConversationChain with llm and memory only
+conversation = ConversationChain(llm=chat_model, memory=memory)
 
 st.title("Fintech Billing Extractor Chatbot")
 
