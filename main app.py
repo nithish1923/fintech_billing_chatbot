@@ -5,11 +5,6 @@ from io import BytesIO
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
-from langchain.prompts.chat import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
 
 st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 
@@ -17,22 +12,13 @@ st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 chat_model = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.3)
 
-# Memory for chat history
+# Initialize memory
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-# Define custom prompt template (instead of using CONVERSATION_PROMPT)
-prompt = ChatPromptTemplate.from_messages([
-    SystemMessagePromptTemplate.from_template(
-        "You are a helpful AI assistant that extracts billing info from user input and PDFs."
-    ),
-    HumanMessagePromptTemplate.from_template("{input}")
-])
-
-# Create conversation chain with prompt and memory
+# Create conversation chain WITHOUT prompt param
 conversation = ConversationChain(
     llm=chat_model,
-    memory=memory,
-    prompt=prompt,
+    memory=memory
 )
 
 st.title("Fintech Billing Extractor Chatbot")
@@ -41,10 +27,8 @@ uploaded_files = st.file_uploader(
     "Upload multiple invoice PDFs", type=["pdf"], accept_multiple_files=True
 )
 
-# Store extracted rows for Excel
 extracted_rows = []
 
-# Chatbot UI
 st.header("Chat with Billing Assistant")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -73,7 +57,6 @@ if st.button("Extract Data and Generate Excel"):
     if not uploaded_files:
         st.error("Please upload PDF invoice files first.")
     else:
-        # Get last user input about fields
         fields = []
         if len(st.session_state.chat_history) >= 2:
             last_user_text = st.session_state.chat_history[-2]["content"].lower()
@@ -117,7 +100,6 @@ if st.button("Extract Data and Generate Excel"):
         else:
             st.warning("No data extracted. Try specifying billing fields in chat first.")
 
-# Display chat history
 if st.session_state.chat_history:
     st.subheader("Chat History")
     for chat in st.session_state.chat_history:
@@ -125,3 +107,4 @@ if st.session_state.chat_history:
             st.markdown(f"**You:** {chat['content']}")
         else:
             st.markdown(f"**Assistant:** {chat['content']}")
+
