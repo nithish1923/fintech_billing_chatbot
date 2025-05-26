@@ -5,16 +5,20 @@ from io import BytesIO
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
+from langchain.prompts import CONVERSATION_PROMPT
 
 st.set_page_config(page_title="Fintech Billing Extractor Chatbot")
 
-# Initialize OpenAI Chat model with API key
+# Initialize OpenAI Chat model
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 chat_model = ChatOpenAI(openai_api_key=OPENAI_API_KEY, temperature=0.3)
 
-# Initialize memory and conversation chain
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-conversation = ConversationChain(llm=chat_model, memory=memory)
+conversation = ConversationChain(
+    llm=chat_model,
+    memory=memory,
+    prompt=CONVERSATION_PROMPT,
+)
 
 st.title("Fintech Billing Extractor Chatbot")
 
@@ -57,25 +61,31 @@ if st.button("Extract Data and Generate Excel"):
     if not uploaded_files:
         st.error("Please upload PDF invoice files first.")
     else:
-        # Extract fields from last user input in chat
+        # For demo: extract simple fields by searching for user requested fields in chat
+        # Parse fields from last user input (naive approach)
         fields = []
-        if len(st.session_state.chat_history) >= 2:
-            last_user_text = st.session_state.chat_history[-2]["content"].lower()
-            keywords = ["invoice number", "vendor", "date", "total amount", "amount", "due date"]
-            for kw in keywords:
-                if kw in last_user_text:
-                    fields.append(kw)
+        last_user_text = (
+            st.session_state.chat_history[-2]["content"]
+            if len(st.session_state.chat_history) >= 2
+            else ""
+        )
+        # Simple keywords check
+        keywords = ["invoice number", "vendor", "date", "total amount", "amount", "due date"]
+        for kw in keywords:
+            if kw in last_user_text.lower():
+                fields.append(kw)
 
-        # Default fields if none specified
         if not fields:
+            # Default fields if user did not specify
             fields = ["invoice number", "vendor", "date", "total amount"]
 
         for file in uploaded_files:
             text = extract_text_from_pdf(file)
-            # Naive extraction by looking for keywords in lines
+            # Very naive extraction: search lines for each field keyword
             row = {}
             lines = text.split("\n")
             for field in fields:
+                # Find line with field keyword and extract text after colon or keyword
                 value = ""
                 for line in lines:
                     if field in line.lower():
