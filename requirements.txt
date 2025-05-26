@@ -1,8 +1,6 @@
 streamlit
 pdfplumber
 pandas
-openai
-langchain
-langchain_community
 openpyxl
-
+langchain>=0.0.240
+openai
